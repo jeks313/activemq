@@ -1,0 +1,83 @@
+---
+# Found out what's available by using a local docker-compose with activemq and...
+# curl -u admin:admin http://localhost:8161/api/jolokia/list
+# specific mbeam:
+# curl -u admin:admin http://localhost:8161/api/jolokia/read/org.apache.activemq:brokerName=localhost,destinationName=VirtualTopic.sum_service.events,destinationType=Topic,type=Broker | jq
+
+startDelaySeconds: 10
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+whitelistObjectNames: ["org.apache.activemq:*"]
+blacklistObjectNames: ["org.apache.activemq:connector=clientConnectors,*","org.apache.activemq:connector=networkConnectors,*","org.apache.activemq:clientId=ID*,*"]
+rules:
+  #
+  # Server metrics
+  #
+  - pattern: 'org.apache.activemq<type=Broker, brokerName=([\w\-.]+)><>(\w+)'
+    name: activemq_system_$2
+    help: "Activemq system metric for $2"
+    labels:
+      brokername: $1
+    type: GAUGE
+
+  #
+  # Queue/topic metrics
+  #
+  - pattern: 'org.apache.activemq<type=(\w+), brokerName=([\w\-.]+), destinationType=(\w+), destinationName=([\w\-.]+)><>(QueueSize|EnqueueCount|DequeueCount|DispatchCount)'
+    name: activemq_$5
+    labels:
+      brokername: $2
+      type: $3
+      destination: $4
+    help: "Message counts"
+    type: COUNTER
+  - pattern: 'org.apache.activemq<type=(\w+), brokerName=([\w\-.]+), destinationType=(Queue), destinationName=([\w\-.]+)><>(ConsumerCount)'
+    name: activemq_$5
+    labels:
+      brokername: $2
+      type: $3
+      destination: $4
+    help: "Active Queue consumers"
+    type: GAUGE
+  - pattern: 'org.apache.activemq<type=(\w+), brokerName=([\w\-.]+), destinationType=(Topic), destinationName=([\w\-.]+)><>(ProducerCount)'
+    name: activemq_$5
+    labels:
+      brokername: $2
+      type: $3
+      destination: $4
+    help: "Active Topic producers"
+    type: GAUGE
+  - pattern: 'org.apache.activemq<type=(\w+), brokerName=([\w\-.]+), destinationType=(\w+), destinationName=([\w\-.]+)><>(AverageBlockedTime|AverageEnqueueTime)'
+    name: activemq_$5
+    labels:
+      brokername: $2
+      type: $3
+      destination: $4
+    help: "Average statistics"
+    type: GAUGE
+  - pattern: 'org.apache.activemq<type=(\w+), brokerName=([\w\-.]+), destinationType=(Queue), destinationName=([\w\-.]+)><>(MemoryUsageByteCount)'
+    name: activemq_$5
+    labels:
+      brokername: $2
+      type: $3
+      destination: $4
+    help: "Queue Message Memory usage"
+    type: GAUGE
+  - pattern: 'org.apache.activemq<type=(\w+), brokerName=([\w\-.]+), destinationType=(Topic), destinationName=([\w\-.]+)><>(AverageMessageSize)'
+    name: activemq_$5
+    labels:
+      brokername: $2
+      type: $3
+      destination: $4
+    help: "Topic AverageMessageSize"
+    type: GAUGE
+  - pattern: 'org.apache.activemq<type=(\w+), brokerName=([\w\-.]+), destinationType=(Queue), destinationName=([\w\-.]+)><>(MemoryPercentUsage)'
+    name: activemq_$5
+    labels:
+      brokername: $2
+      type: $3
+      destination: $4
+    help: "Queue Memory Percent Usage"
+    type: GAUGE
+
+
