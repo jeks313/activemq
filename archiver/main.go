@@ -60,6 +60,11 @@ func main() {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	}
 
+	if opts.Application.Version {
+		options.LogVersion()
+		os.Exit(0)
+	}
+
 	// set config from default environment variables / config files
 	options.Environment(opts.Application.Environment)
 
@@ -119,6 +124,7 @@ func main() {
 	q := consumer.Queue{
 		Hostname: opts.ActiveMQ.Hostname,
 		Topic:    opts.ActiveMQ.Topic,
+		Key:      opts.ActiveMQ.Key,
 		Ctx:      ctx,
 	}
 
