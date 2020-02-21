@@ -7,6 +7,7 @@ import (
 	"github.com/go-stomp/stomp"
 	"github.com/jeks313/activemq-archiver/archive"
 	"github.com/rs/zerolog/log"
+	"github.com/tidwall/gjson"
 )
 
 // Queue represents an archive queue on a particular topic
@@ -14,6 +15,7 @@ type Queue struct {
 	Hostname string // activemq hostname: localhost:61613
 	Queue    string // queue: queue name, e.g. Archive
 	Topic    string // topic: topic name, e.g. MySuperDataTopic
+	Key      string // key: what key to partition data on, assumes payload is JSON
 	Ctx      context.Context
 	conn     *stomp.Conn
 	sub      *stomp.Subscription
@@ -60,7 +62,11 @@ func (q *Queue) Consume(arch *archive.Archives) error {
 			if msg == nil {
 				log.Info().Msg("queue: received nil message, stopping")
 			}
-			err := arch.Write(q.Topic, "key", msg.Body)
+			keyValue := fromJSON(msg.Body, q.Key)
+			if keyValue == "" {
+				keyValue = "undef"
+			}
+			err := arch.Write(q.Topic, keyValue, msg.Body)
 			if err != nil {
 				log.Error().Err(err).Msg("queue: failed to write document to archive")
 				return err
@@ -72,4 +78,11 @@ func (q *Queue) Consume(arch *archive.Archives) error {
 			}
 		}
 	}
+}
+
+// TODO: funcJSON this needs a little more meat on the bones I think to handle bad JSON and log
+// this will just return empty strings if the data in is garbage, which doesn't give a lot of
+// visibility into something drifting, like a schema change
+func fromJSON(doc []byte, key string) string {
+	return gjson.GetBytes(doc, key).String()
 }
