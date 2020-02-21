@@ -16,5 +16,6 @@ require (
 	github.com/markbates/pkger v0.12.8
 	github.com/prometheus/client_golang v1.2.1
 	github.com/rs/zerolog v1.17.2
+	github.com/tidwall/gjson v1.5.0
 	google.golang.org/appengine v1.6.5 // indirect
 )
