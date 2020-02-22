@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -44,7 +45,7 @@ func writeErr(arch *Archive, doc []byte) error {
 		log.Error().Err(err).Msgf("write: failed to write document to archive: %v", arch)
 		return err
 	}
-	log.Info().Str("key", arch.key).Int("size", n).Msg("write: wrote document")
+	log.Debug().Str("key", arch.key).Str("filename", arch.filename).Int("size", n).Msg("write: wrote document")
 	return nil
 }
 
@@ -56,11 +57,16 @@ type Archive struct {
 	key            string
 	filename       string
 	out            *os.File
+	logger         zerolog.Logger
+	writes         int64
 }
 
 // Open opens an archive file based on the current time and key
 func (a *Archive) Open() error {
 	a.filename = a.formatFilename()
+	a.logger = log.With().Str("filename", a.filename).Str("key", a.key).Logger()
+	a.logger.Info().Msg("opening new archive")
+	a.writes = 0
 	openFlag := os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	f, err := os.OpenFile(a.filename, openFlag, 0644)
 	if os.IsExist(err) {
@@ -76,6 +82,7 @@ func (a *Archive) Open() error {
 
 // Close closes and syncs a file
 func (a *Archive) Close() error {
+	a.logger.Info().Int64("writes", a.writes).Msg("closing")
 	err := a.out.Sync()
 	if err != nil {
 		log.Error().Err(err).Msg("failed to sync file on close")
@@ -92,14 +99,18 @@ func (a *Archive) Write(doc []byte) (int, error) {
 	if a.needsRotation() {
 		err := a.Close()
 		if err != nil {
-			log.Error().Err(err).Str("filename", a.filename).Msg("failed to close file")
+			a.logger.Error().Err(err).Str("filename", a.filename).Msg("failed to close file")
 			return 0, err
 		}
 		err = a.Open()
 		if err != nil {
-			log.Error().Err(err).Str("filename", a.filename).Msg("failed to open file")
+			a.logger.Error().Err(err).Str("filename", a.filename).Msg("failed to open file")
 			return 0, err
 		}
+	}
+	a.writes = a.writes + 1
+	if a.writes%100 == 0 { // log every 100 writes so we have some activity logging TODO: change this to a tracer?
+		a.logger.Info().Int64("writes", a.writes).Msg("document writes")
 	}
 	return a.out.Write(doc)
 }
