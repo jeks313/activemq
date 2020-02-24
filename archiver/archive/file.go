@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -12,6 +13,7 @@ import (
 
 // Archives is a set of archive files, one per time period per key
 type Archives struct {
+	sync.Mutex
 	keys map[string]*Archive
 }
 
@@ -20,6 +22,22 @@ func New() *Archives {
 	a := &Archives{}
 	a.keys = make(map[string]*Archive)
 	return a
+}
+
+// CheckAndClose goes through the open archives and closes them if they are done with
+func (a *Archives) CheckAndClose() {
+	a.Lock()
+	defer a.Unlock()
+	for k, arch := range a.keys {
+		if arch.NeedsRotation() {
+			err := arch.Close()
+			if err != nil {
+				log.Error().Err(err).Str("key", k).Str("filename", arch.filename).Msg("failed to close archive")
+				continue
+			}
+			delete(a.keys, k)
+		}
+	}
 }
 
 // Writes a document with a certain key
@@ -34,7 +52,9 @@ func (a *Archives) Write(topic, key string, doc []byte) error {
 		log.Error().Err(err).Msgf("write: failed to open new archive file: %v", arch)
 		return err
 	}
+	a.Lock()
 	a.keys[k] = arch
+	a.Unlock()
 	return writeErr(arch, doc)
 }
 
@@ -96,7 +116,7 @@ const dateTimeFormat = "2006-01-02_15"
 
 // Write writes a provided document to the archive, checks if filename needs rotation
 func (a *Archive) Write(doc []byte) (int, error) {
-	if a.needsRotation() {
+	if a.NeedsRotation() {
 		err := a.Close()
 		if err != nil {
 			a.logger.Error().Err(err).Str("filename", a.filename).Msg("failed to close file")
@@ -129,8 +149,8 @@ func (a *Archive) formatFilename() string {
 	return filename
 }
 
-// needsRotating checks the filename to see if we need to roll this file over
-func (a *Archive) needsRotation() bool {
+// NeedsRotating checks the filename to see if we need to roll this file over
+func (a *Archive) NeedsRotation() bool {
 	filename := a.formatFilename()
 	if filename != a.filename {
 		return true
