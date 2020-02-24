@@ -128,22 +128,40 @@ func main() {
 		Ctx:      ctx,
 	}
 
-	log.Info().Str("hostname", opts.ActiveMQ.Hostname).Msg("activemq: connecting")
-	err = q.Connect(opts.ActiveMQ.Hostname)
-	if err != nil {
-		log.Error().Err(err).Str("hostname", opts.ActiveMQ.Hostname).Msg("failed to connect to activemq")
-		os.Exit(1)
-	}
+	// main activemq consumer loop, reconnects with 2 sec delay
+	go func() {
+		var err error
+		var started bool
+		for {
+			if started {
+				time.Sleep(2 * time.Second)
+			}
+			started = true
 
-	log.Info().Str("hostname", opts.ActiveMQ.Hostname).Str("topic", opts.ActiveMQ.Topic).Msg("activemq: subscribing")
-	err = q.Subscribe(opts.ActiveMQ.Topic)
-	if err != nil {
-		log.Error().Err(err).Str("topic", opts.ActiveMQ.Topic).Msg("unable to subscribe to topic")
-		os.Exit(1)
-	}
+			log.Info().Str("hostname", opts.ActiveMQ.Hostname).Msg("activemq: connecting")
+			err = q.Connect(opts.ActiveMQ.Hostname)
+			if err != nil {
+				log.Error().Err(err).Str("hostname", opts.ActiveMQ.Hostname).Msg("failed to connect to activemq")
+				continue
+			}
 
-	log.Info().Str("hostname", opts.ActiveMQ.Hostname).Str("topic", opts.ActiveMQ.Topic).Msg("activemq: consuming")
-	go q.Consume(a)
+			log.Info().Str("hostname", opts.ActiveMQ.Hostname).Str("topic", opts.ActiveMQ.Topic).Msg("activemq: subscribing")
+			err = q.Subscribe(opts.ActiveMQ.Topic)
+			if err != nil {
+				log.Error().Err(err).Str("topic", opts.ActiveMQ.Topic).Msg("unable to subscribe to topic")
+				continue
+			}
+
+			log.Info().Str("hostname", opts.ActiveMQ.Hostname).Str("topic", opts.ActiveMQ.Topic).Msg("activemq: consuming")
+			err = q.Consume(a)
+
+			if err != nil {
+				log.Error().Err(err).Msg("consumer ended")
+			}
+
+			log.Info().Msg("waiting to re-connect...")
+		}
+	}()
 
 	go func() {
 		select {

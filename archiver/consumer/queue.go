@@ -25,7 +25,6 @@ type Queue struct {
 func (q *Queue) Connect(hostname string) error {
 	conn, err := stomp.Dial("tcp", hostname)
 	if err != nil {
-		log.Error().Err(err).Str("hostname", hostname).Msg("failed to connect to activemq")
 		return err
 	}
 	q.conn = conn
@@ -37,7 +36,7 @@ func (q *Queue) Subscribe(topic string) error {
 	t := fmt.Sprintf("/queue/Consumer.Archive.VirtualTopic.%s", topic)
 	sub, err := q.conn.Subscribe(t, stomp.AckClientIndividual)
 	if err != nil {
-		log.Error().Err(err).Str("topic", topic).Msg("failed to subscribe to topic")
+		return err
 	}
 	q.sub = sub
 	return nil
@@ -61,6 +60,11 @@ func (q *Queue) Consume(arch *archive.Archives) error {
 		case msg := <-q.sub.C:
 			if msg == nil {
 				log.Info().Msg("queue: received nil message, stopping")
+				return fmt.Errorf("consume: received error")
+			}
+			if msg.Err != nil {
+				log.Error().Err(msg.Err).Msg("consume: received error")
+				return msg.Err
 			}
 			keyValue := fromJSON(msg.Body, q.Key)
 			if keyValue == "" {
