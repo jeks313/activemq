@@ -37,12 +37,13 @@ func randomUUIDs(num int) []string {
 	return uuids
 }
 
+// just some random fakey struct to put some JSON data in the topic
 type fakey struct {
-	UUID        string
-	Name        string
-	Time        time.Time
-	SoftwareIDs []int
-	Model       string
+	UUID        string    `json:"uuid"`
+	Name        string    `json:"name"`
+	Time        time.Time `json:"time"`
+	SoftwareIDs []int     `json:"software_id"`
+	Model       string    `json:"model"`
 }
 
 const numUUIDs = 10
