@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/go-stomp/stomp"
-	"github.com/jeks313/activemq-archiver/archive"
+	"github.com/jeks313/activemq-archiver/internal/archive"
 	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
 )

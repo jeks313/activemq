@@ -21,10 +21,10 @@ import (
 
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/jeks313/activemq-archiver/archive"
-	"github.com/jeks313/activemq-archiver/consumer"
-	"github.com/jeks313/activemq-archiver/options"
-	"github.com/jeks313/activemq-archiver/server"
+	"github.com/jeks313/activemq-archiver/internal/archive"
+	"github.com/jeks313/activemq-archiver/internal/consumer"
+	"github.com/jeks313/activemq-archiver/pkg/options"
+	"github.com/jeks313/activemq-archiver/pkg/server"
 	"github.com/rs/zerolog"
 )
 

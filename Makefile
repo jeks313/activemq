@@ -15,12 +15,11 @@ endif
 archiver: 
 	@go get
 	@mkdir -p build
-	cd cmd/archiver
 	@echo $(VERSION) $(GITHASH) $(BUILDDATE)
-	@go build -o ../../build/$(PROJ) -ldflags "\
+	@go build -o build/$(PROJ) -ldflags "\
 		-X $(REPO)/options.Version=$(VERSION) \
 	 	-X $(REPO)/options.GitHash=$(GITHASH) \
 		-X $(REPO)/options.Build=$(BUILDDATE) \
-		"
+		" ./...
 	cp build/$(PROJ) build/$(PROJ)-$(VERSION)
 	@cd -
