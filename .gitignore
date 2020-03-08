@@ -1,0 +1,6 @@
+ref
+template
+cmd/archiver/pkged.go
+build/*
+archive.*
+activemq-archiver
