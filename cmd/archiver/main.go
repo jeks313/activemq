@@ -41,6 +41,7 @@ type ActivemqOpts struct {
 	Topic    string `long:"topic" env:"TOPIC" description:"topic to archive" required:"true"`
 	Hostname string `long:"activemq" env:"ACTIVE_MQ" description:"activemq hostname" default:"localhost:61613"`
 	Key      string `long:"key" env:"TOPIC_KEY" description:"key to look for in the document to use to construct archive filename" required:"true"`
+	MaxSize  int    `long:"max-size" env:"MAX_ARCHIVE_SIZE" description:"maximum archive size, defaults to 32M for athena usage in S3" default:"33554432"`
 }
 
 func main() {
@@ -120,7 +121,7 @@ func main() {
 		cancel()
 	}()
 
-	a := archive.New()
+	a := archive.New(opts.ActiveMQ.MaxSize)
 	q := consumer.Queue{
 		Hostname: opts.ActiveMQ.Hostname,
 		Topic:    opts.ActiveMQ.Topic,

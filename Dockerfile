@@ -1,13 +1,14 @@
 FROM golang:latest as builder
 
-WORKDIR /go
-COPY .. /go
-WORKDIR /go/archiver
+WORKDIR /go/activemq-archiver
+COPY . /go/activemq-archiver
 
-RUN make build
+RUN go version
+
+RUN make archiver
 
 FROM scratch
 
-COPY --from=builder /go/build/activemq-archive /
-CMD ["/activemq-archive"]
+COPY --from=builder /go/activemq-archiver/build/activemq-archiver /
+CMD ["/activemq-archiver"]
 

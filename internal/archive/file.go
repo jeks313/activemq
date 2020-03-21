@@ -14,13 +14,15 @@ import (
 // Archives is a set of archive files, one per time period per key
 type Archives struct {
 	sync.Mutex
-	keys map[string]*Archive
+	maxBytes int
+	keys     map[string]*Archive
 }
 
 // New creates a new Archives et
-func New() *Archives {
+func New(maxBytes int) *Archives {
 	a := &Archives{}
 	a.keys = make(map[string]*Archive)
+	a.maxBytes = maxBytes
 	return a
 }
 
@@ -29,7 +31,7 @@ func (a *Archives) CheckAndClose() {
 	a.Lock()
 	defer a.Unlock()
 	for k, arch := range a.keys {
-		if arch.NeedsRotation() {
+		if arch.NeedsRotation(0) {
 			err := arch.Close()
 			if err != nil {
 				log.Error().Err(err).Str("key", k).Str("filename", arch.filename).Msg("failed to close archive")
@@ -46,15 +48,15 @@ func (a *Archives) Write(topic, key string, doc []byte) error {
 	if a, ok := a.keys[k]; ok {
 		return writeErr(a, doc)
 	}
-	arch := &Archive{topic: topic, key: key}
+	arch := &Archive{topic: topic, key: key, maxBytes: a.maxBytes}
 	err := arch.Open()
 	if err != nil {
 		log.Error().Err(err).Msgf("write: failed to open new archive file: %v", arch)
 		return err
 	}
 	a.Lock()
+	defer a.Unlock()
 	a.keys[k] = arch
-	a.Unlock()
 	return writeErr(arch, doc)
 }
 
@@ -71,6 +73,7 @@ func writeErr(arch *Archive, doc []byte) error {
 
 // Archive is a single file representing a timeslice of data for a particular key
 type Archive struct {
+	sync.Mutex
 	topic          string
 	dateTimeFormat string
 	template       string
@@ -79,14 +82,20 @@ type Archive struct {
 	out            *os.File
 	logger         zerolog.Logger
 	writes         int64
+	sizeBytes      int
+	maxBytes       int
+	index          int
 }
 
 // Open opens an archive file based on the current time and key
 func (a *Archive) Open() error {
+	a.Lock()
+	defer a.Unlock()
 	a.filename = a.formatFilename()
 	a.logger = log.With().Str("filename", a.filename).Str("key", a.key).Logger()
 	a.logger.Info().Msg("opening new archive")
 	a.writes = 0
+	a.sizeBytes = 0
 	openFlag := os.O_WRONLY | os.O_CREATE | os.O_APPEND
 	f, err := os.OpenFile(a.filename, openFlag, 0644)
 	if os.IsExist(err) {
@@ -102,6 +111,8 @@ func (a *Archive) Open() error {
 
 // Close closes and syncs a file
 func (a *Archive) Close() error {
+	a.Lock()
+	defer a.Unlock()
 	a.logger.Info().Int64("writes", a.writes).Msg("closing")
 	err := a.out.Sync()
 	if err != nil {
@@ -111,12 +122,14 @@ func (a *Archive) Close() error {
 	return a.out.Close()
 }
 
-const template = "archive.<TOPIC>.<DATETIME>.<KEY>.log"
+const template = "archive-<TOPIC>-<DATETIME>-<KEY>-<INDEX>.log"
 const dateTimeFormat = "2006-01-02_15"
 
 // Write writes a provided document to the archive, checks if filename needs rotation
 func (a *Archive) Write(doc []byte) (int, error) {
-	if a.NeedsRotation() {
+	a.Lock()
+	defer a.Unlock()
+	if a.NeedsRotation(len(doc) + 1) {
 		err := a.Close()
 		if err != nil {
 			a.logger.Error().Err(err).Str("filename", a.filename).Msg("failed to close file")
@@ -132,7 +145,9 @@ func (a *Archive) Write(doc []byte) (int, error) {
 	if a.writes%100 == 0 { // log every 100 writes so we have some activity logging TODO: change this to a tracer?
 		a.logger.Info().Int64("writes", a.writes).Msg("document writes")
 	}
-	return a.out.Write(doc)
+	n, err := a.out.Write(doc)
+	a.sizeBytes = a.sizeBytes + n
+	return n, err
 }
 
 func (a *Archive) formatFilename() string {
@@ -146,13 +161,19 @@ func (a *Archive) formatFilename() string {
 	filename := strings.Replace(a.template, "<DATETIME>", datetime, -1)
 	filename = strings.Replace(filename, "<TOPIC>", a.topic, -1)
 	filename = strings.Replace(filename, "<KEY>", a.key, -1)
+	filename = strings.Replace(filename, "<INDEX>", fmt.Sprintf("02d", a.index), -1)
 	return filename
 }
 
-// NeedsRotating checks the filename to see if we need to roll this file over
-func (a *Archive) NeedsRotation() bool {
+// NeedsRotation checks the filename to see if we need to roll this file over
+func (a *Archive) NeedsRotation(currentWriteSize int) bool {
+	a.Lock()
+	defer a.Unlock()
 	filename := a.formatFilename()
 	if filename != a.filename {
+		return true
+	}
+	if a.sizeBytes+currentWriteSize > a.maxBytes {
 		return true
 	}
 	return false
