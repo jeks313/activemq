@@ -106,6 +106,7 @@ func (a *Archive) Open() error {
 		return err
 	}
 	a.out = f
+	a.logger.Debug().Msg("opened new file")
 	return nil
 }
 
@@ -119,16 +120,17 @@ func (a *Archive) Close() error {
 		log.Error().Err(err).Msg("failed to sync file on close")
 		return err
 	}
+	a.index = a.index + 1
+	a.writes = 0
+	a.sizeBytes = 0
 	return a.out.Close()
 }
 
-const template = "archive-<TOPIC>-<DATETIME>-<KEY>-<INDEX>.log"
+const template = "archive_<TOPIC>_<DATETIME>_<KEY>_<INDEX>.log"
 const dateTimeFormat = "2006-01-02_15"
 
 // Write writes a provided document to the archive, checks if filename needs rotation
 func (a *Archive) Write(doc []byte) (int, error) {
-	a.Lock()
-	defer a.Unlock()
 	if a.NeedsRotation(len(doc) + 1) {
 		err := a.Close()
 		if err != nil {
@@ -145,6 +147,8 @@ func (a *Archive) Write(doc []byte) (int, error) {
 	if a.writes%100 == 0 { // log every 100 writes so we have some activity logging TODO: change this to a tracer?
 		a.logger.Info().Int64("writes", a.writes).Msg("document writes")
 	}
+	a.Lock()
+	defer a.Unlock()
 	n, err := a.out.Write(doc)
 	a.sizeBytes = a.sizeBytes + n
 	return n, err
@@ -161,7 +165,7 @@ func (a *Archive) formatFilename() string {
 	filename := strings.Replace(a.template, "<DATETIME>", datetime, -1)
 	filename = strings.Replace(filename, "<TOPIC>", a.topic, -1)
 	filename = strings.Replace(filename, "<KEY>", a.key, -1)
-	filename = strings.Replace(filename, "<INDEX>", fmt.Sprintf("02d", a.index), -1)
+	filename = strings.Replace(filename, "<INDEX>", fmt.Sprintf("%02d", a.index), -1)
 	return filename
 }
 
