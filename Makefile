@@ -21,7 +21,7 @@ get:
 .PHONY: archiver
 archiver: get
 	echo $(VERSION) $(GITHASH) $(BUILDDATE)
-	go build -o build/activemq-archiver -ldflags "\
+	CGO_ENABLED=0 go build -o build/activemq-archiver -ldflags "\
 		-X $(REPO)/pkg/options.Version=$(VERSION) \
 	 	-X $(REPO)/pkg/options.GitHash=$(GITHASH) \
 		-X $(REPO)/pkg/options.Build=$(BUILDDATE) \
@@ -31,7 +31,7 @@ archiver: get
 .PHONY: producer
 producer: get
 	echo $(VERSION) $(GITHASH) $(BUILDDATE)
-	go build -o build/producer -ldflags "\
+	CGO_ENABLED=0 go build -o build/producer -ldflags "\
 		-X $(REPO)/pkg/options.Version=$(VERSION) \
 	 	-X $(REPO)/pkg/options.GitHash=$(GITHASH) \
 		-X $(REPO)/pkg/options.Build=$(BUILDDATE) \
@@ -41,7 +41,7 @@ producer: get
 .PHONY: consumer
 consumer: get
 	echo $(VERSION) $(GITHASH) $(BUILDDATE)
-	go build -o build/consumer -ldflags "\
+	CGO_ENABLED=0 go build -o build/consumer -ldflags "\
 		-X $(REPO)/pkg/options.Version=$(VERSION) \
 	 	-X $(REPO)/pkg/options.GitHash=$(GITHASH) \
 		-X $(REPO)/pkg/options.Build=$(BUILDDATE) \
