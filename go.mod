@@ -22,6 +22,7 @@ require (
 	github.com/prometheus/client_golang v1.2.1
 	github.com/rs/zerolog v1.17.2
 	github.com/tidwall/gjson v1.5.0
+	github.com/tidwall/pretty v1.0.1
 	github.com/tidwall/sjson v1.0.4
 	google.golang.org/appengine v1.6.5 // indirect
 )

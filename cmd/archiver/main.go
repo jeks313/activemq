@@ -23,6 +23,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jeks313/activemq-archiver/internal/archive"
 	"github.com/jeks313/activemq-archiver/internal/consumer"
+	"github.com/jeks313/activemq-archiver/internal/content"
 	"github.com/jeks313/activemq-archiver/pkg/options"
 	"github.com/jeks313/activemq-archiver/pkg/server"
 	"github.com/rs/zerolog"
@@ -130,23 +131,19 @@ func main() {
 	a := archive.New(opts.ActiveMQ.MaxSize)
 	a.Path = opts.ActiveMQ.ArchivePath
 
-	q := consumer.Queue{
-		Hostname: opts.ActiveMQ.Hostname,
-		Topic:    opts.ActiveMQ.Topic,
-		Key:      opts.ActiveMQ.Key,
-		Ctx:      ctx,
-	}
+	q := consumer.New()
+	q.Hostname = opts.ActiveMQ.Hostname
+	q.Topic = opts.ActiveMQ.Topic
+	q.Key = opts.ActiveMQ.Key
+	q.Ctx = ctx
+	q.ContentTypeHeader = "X-Content-Type"
+	q.Handlers["zip;json"] = content.HandlerFromZipJSON
+	q.Handlers["b64;zip;json"] = content.HandlerFromBase64ZipJSON
 
 	// main activemq consumer loop, reconnects with 2 sec delay
 	go func() {
 		var err error
-		var started bool
 		for {
-			if started {
-				time.Sleep(2 * time.Second)
-			}
-			started = true
-
 			log.Info().Str("hostname", opts.ActiveMQ.Hostname).Msg("activemq: connecting")
 			err = q.Connect(opts.ActiveMQ.Hostname)
 			if err != nil {
@@ -169,6 +166,7 @@ func main() {
 			}
 
 			log.Info().Msg("waiting to re-connect...")
+			time.Sleep(2 * time.Second)
 		}
 	}()
 

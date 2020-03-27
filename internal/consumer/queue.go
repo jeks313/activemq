@@ -8,6 +8,7 @@ import (
 	"github.com/jeks313/activemq-archiver/internal/archive"
 	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/pretty"
 	"github.com/tidwall/sjson"
 )
 
@@ -22,6 +23,12 @@ type Queue struct {
 	Ctx               context.Context
 	conn              *stomp.Conn
 	sub               *stomp.Subscription
+}
+
+func New() *Queue {
+	q := &Queue{}
+	q.Handlers = make(map[string]ContentTypeHandler)
+	return q
 }
 
 // Connect sets up the activemq connection
@@ -82,16 +89,17 @@ func (q *Queue) Consume(arch *archive.Archives) error {
 				}
 				continue
 			}
-			keyValue := fromJSON(msg.Body, q.Key)
-			if keyValue == "" {
-				keyValue = "undef"
-			}
 			headersAndData, err := sjson.SetBytes(data, "headers", headers)
+			headersAndDataNonPretty := pretty.UglyInPlace(headersAndData) // yes some of our payloads are pretty printed, sigh
 			if err != nil {
 				log.Error().Err(err).Msg("queue: failed to merge headers to payload")
 				return err
 			}
-			err = arch.Write(q.Topic, keyValue, headersAndData)
+			keyValue := fromJSON(headersAndDataNonPretty, q.Key)
+			if keyValue == "" {
+				keyValue = "undef"
+			}
+			err = arch.Write(q.Topic, keyValue, headersAndDataNonPretty)
 			if err != nil {
 				log.Error().Err(err).Msg("queue: failed to write document to archive")
 				return err
@@ -106,12 +114,16 @@ func (q *Queue) Consume(arch *archive.Archives) error {
 }
 
 func (q *Queue) handleContentType(headers map[string]string, data []byte) ([]byte, error) {
-	if contentType, ok := headers[q.ContentTypeHeader]; ok {
+	var contentType string
+	var ok bool
+	if contentType, ok = headers[q.ContentTypeHeader]; ok {
 		if handler, ok := q.Handlers[contentType]; ok {
+			log.Debug().Str("content_type", contentType).Msg("handling data conversion")
 			return handler(data)
 		}
 		return data, fmt.Errorf("unhandled content type: %v", contentType)
 	}
+	log.Debug().Str("content_type_header", q.ContentTypeHeader).Msg("no content type header found")
 	return data, nil
 }
 
