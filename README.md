@@ -1,6 +1,20 @@
-# Demo Blueprint
+# ActiveMQ Archiver and other Utilities
 
-References: [Golang Blueprint](https://github.org/jeks313/service-blueprint-golang).
+## Archiver
+
+Fields wanted:
+
+- `Ctes-Platform`
+- `esn`
+- `deviceIdentity`
+- `deviceUid`
+- `accountUid`
+
+Formats:
+
+- `X-Content-Type`
+ - `zip;json`
+ - `b64;zip;json`
 
 # API
 
@@ -31,3 +45,5 @@ Build for production:
 ```
 $ mage build
 ```
+
+References: [Golang Blueprint](https://github.org/jeks313/service-blueprint-golang).

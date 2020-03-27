@@ -3,6 +3,7 @@ package archive
 import (
 	"fmt"
 	"os"
+	"path"
 	"strings"
 	"sync"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 // Archives is a set of archive files, one per time period per key
 type Archives struct {
+	Path string // path to write to
 	sync.Mutex
 	maxBytes int
 	keys     map[string]*Archive
@@ -48,10 +50,10 @@ func (a *Archives) Write(topic, key string, doc []byte) error {
 	if a, ok := a.keys[k]; ok {
 		return writeErr(a, doc)
 	}
-	arch := &Archive{topic: topic, key: key, maxBytes: a.maxBytes}
+	arch := &Archive{topic: topic, key: key, maxBytes: a.maxBytes, path: a.Path}
 	err := arch.Open()
 	if err != nil {
-		log.Error().Err(err).Msgf("write: failed to open new archive file: %v", arch)
+		log.Error().Err(err).Str("filename", arch.filename).Msg("write: failed to open new archive file")
 		return err
 	}
 	a.Lock()
@@ -80,6 +82,7 @@ type Archive struct {
 	key            string
 	filename       string
 	out            *os.File
+	path           string
 	logger         zerolog.Logger
 	writes         int64
 	sizeBytes      int
@@ -166,7 +169,7 @@ func (a *Archive) formatFilename() string {
 	filename = strings.Replace(filename, "<TOPIC>", a.topic, -1)
 	filename = strings.Replace(filename, "<KEY>", a.key, -1)
 	filename = strings.Replace(filename, "<INDEX>", fmt.Sprintf("%02d", a.index), -1)
-	return filename
+	return path.Join(a.path, filename)
 }
 
 // NeedsRotation checks the filename to see if we need to roll this file over

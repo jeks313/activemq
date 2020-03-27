@@ -38,10 +38,11 @@ var opts struct {
 
 // ActivemqOpts command line options for activemq
 type ActivemqOpts struct {
-	Topic    string `long:"topic" env:"TOPIC" description:"topic to archive" required:"true"`
-	Hostname string `long:"activemq" env:"ACTIVE_MQ" description:"activemq hostname" default:"localhost:61613"`
-	Key      string `long:"key" env:"TOPIC_KEY" description:"key to look for in the document to use to construct archive filename" required:"true"`
-	MaxSize  int    `long:"max-size" env:"MAX_ARCHIVE_SIZE" description:"maximum archive size, defaults to 32M for athena usage in S3" default:"33554432"`
+	Topic       string `long:"topic" env:"TOPIC" description:"topic to archive" required:"true"`
+	Hostname    string `long:"activemq" env:"ACTIVE_MQ" description:"activemq hostname" default:"localhost:61613"`
+	ArchivePath string `long:"archive-path" env:"ARCHIVE_PATH" default:"/var/lib/activemq-archive" description:"base directory to write archive files"`
+	Key         string `long:"key" env:"TOPIC_KEY" description:"key to look for in the document to use to construct archive filename" required:"true"`
+	MaxSize     int    `long:"max-size" env:"MAX_ARCHIVE_SIZE" description:"maximum archive size, defaults to 32M for athena usage in S3" default:"33554432"`
 }
 
 func main() {
@@ -64,6 +65,11 @@ func main() {
 	if opts.Application.Version {
 		options.LogVersion()
 		os.Exit(0)
+	}
+
+	if _, err := os.Stat(opts.ActiveMQ.ArchivePath); os.IsNotExist(err) {
+		log.Error().Err(err).Str("archive_path", opts.ActiveMQ.ArchivePath).Msg("output path does not exist")
+		os.Exit(1)
 	}
 
 	// set config from default environment variables / config files
@@ -122,6 +128,8 @@ func main() {
 	}()
 
 	a := archive.New(opts.ActiveMQ.MaxSize)
+	a.Path = opts.ActiveMQ.ArchivePath
+
 	q := consumer.Queue{
 		Hostname: opts.ActiveMQ.Hostname,
 		Topic:    opts.ActiveMQ.Topic,
