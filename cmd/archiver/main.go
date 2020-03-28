@@ -39,11 +39,12 @@ var opts struct {
 
 // ActivemqOpts command line options for activemq
 type ActivemqOpts struct {
-	Topic       string `long:"topic" env:"TOPIC" description:"topic to archive" required:"true"`
-	Hostname    string `long:"activemq" env:"ACTIVE_MQ" description:"activemq hostname" default:"localhost:61613"`
-	ArchivePath string `long:"archive-path" env:"ARCHIVE_PATH" default:"/var/lib/activemq-archive" description:"base directory to write archive files"`
-	Key         string `long:"key" env:"TOPIC_KEY" description:"key to look for in the document to use to construct archive filename" required:"true"`
-	MaxSize     int    `long:"max-size" env:"MAX_ARCHIVE_SIZE" description:"maximum archive size, defaults to 32M for athena usage in S3" default:"33554432"`
+	Topic       string   `long:"topic" env:"TOPIC" description:"topic to archive" required:"true"`
+	Hostname    string   `long:"activemq" env:"ACTIVE_MQ" description:"activemq hostname" default:"localhost:61613"`
+	ArchivePath string   `long:"archive-path" env:"ARCHIVE_PATH" default:"/var/lib/activemq-archive" description:"base directory to write archive files"`
+	Key         string   `long:"key" env:"TOPIC_KEY" description:"key to look for in the document to use to construct archive filename" required:"true"`
+	MaxSize     int      `long:"max-size" env:"MAX_ARCHIVE_SIZE" description:"maximum archive size, defaults to 32M for athena usage in S3" default:"33554432"`
+	Headers     []string `long:"header" env:"ACTIVEMQ_HEADERS" description:"headers to include from activemq into the payload" default:"accountUid" default:"deviceIdentity" default:"deviceUid" default:"esn" default:"x-Content-Type" env-delim:","`
 }
 
 func main() {
@@ -136,9 +137,10 @@ func main() {
 	q.Topic = opts.ActiveMQ.Topic
 	q.Key = opts.ActiveMQ.Key
 	q.Ctx = ctx
-	q.ContentTypeHeader = "X-Content-Type"
+	q.ContentTypeHeader = "x-content-type"
 	q.Handlers["zip;json"] = content.HandlerFromZipJSON
 	q.Handlers["b64;zip;json"] = content.HandlerFromBase64ZipJSON
+	q.Headers = opts.ActiveMQ.Headers
 
 	// main activemq consumer loop, reconnects with 2 sec delay
 	go func() {
