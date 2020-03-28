@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/go-stomp/stomp"
 	"github.com/jeks313/activemq-archiver/internal/archive"
@@ -19,6 +20,7 @@ type Queue struct {
 	ContentTypeHeader string                        // header to use to control content type
 	Queue             string                        // queue: queue name, e.g. Archive
 	Topic             string                        // topic: topic name, e.g. MySuperDataTopic
+	Headers           []string                      // headers to include into the payload from the message
 	Key               string                        // key: what key to partition data on, assumes payload is JSON
 	Ctx               context.Context
 	conn              *stomp.Conn
@@ -78,7 +80,7 @@ func (q *Queue) Consume(arch *archive.Archives) error {
 				log.Error().Err(msg.Err).Msg("consume: received error")
 				return msg.Err
 			}
-			headers := headersFromMessage(msg)
+			headers := headersFromMessage(q.Headers, msg)
 			data, err := q.handleContentType(headers, msg.Body)
 			if err != nil {
 				log.Error().Err(err).Msg("failed to convert message type")
@@ -127,13 +129,19 @@ func (q *Queue) handleContentType(headers map[string]string, data []byte) ([]byt
 	return data, nil
 }
 
-func headersFromMessage(msg *stomp.Message) map[string]string {
+func headersFromMessage(headersWanted []string, msg *stomp.Message) map[string]string {
 	headers := make(map[string]string)
+	headersToMerge := make(map[string]string)
 	for i := 0; i < msg.Header.Len(); i++ {
 		header, value := msg.Header.GetAt(i)
-		headers[header] = value
+		headers[strings.ToLower(header)] = value
 	}
-	return headers
+	for _, header := range headersWanted {
+		if value, ok := headers[strings.ToLower(header)]; ok {
+			headersToMerge[strings.ToLower(header)] = value
+		}
+	}
+	return headersToMerge
 }
 
 // TODO: funcJSON this needs a little more meat on the bones I think to handle bad JSON and log
