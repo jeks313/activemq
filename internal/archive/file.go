@@ -123,14 +123,13 @@ func (a *Archive) Close() error {
 		log.Error().Err(err).Msg("failed to sync file on close")
 		return err
 	}
-	a.index = a.index + 1
 	a.writes = 0
 	a.sizeBytes = 0
 	return a.out.Close()
 }
 
-const template = "archive_<TOPIC>_<DATETIME>_<KEY>_<INDEX>.log"
-const dateTimeFormat = "2006-01-02_15"
+const template = "archive_topic=<TOPIC>_dt=<DATETIME>_accountUID=<KEY>_<INDEX>.log"
+const dateTimeFormat = "2006-01-02T15:00"
 
 // Write writes a provided document to the archive, checks if filename needs rotation
 func (a *Archive) Write(doc []byte) (int, error) {
@@ -164,6 +163,7 @@ func (a *Archive) formatFilename() string {
 	if a.dateTimeFormat == "" {
 		a.dateTimeFormat = dateTimeFormat
 	}
+	// TODO: this is terrible, should make this a better formatting than string replacements
 	datetime := time.Now().Format(a.dateTimeFormat)
 	filename := strings.Replace(a.template, "<DATETIME>", datetime, -1)
 	filename = strings.Replace(filename, "<TOPIC>", a.topic, -1)
@@ -176,11 +176,13 @@ func (a *Archive) formatFilename() string {
 func (a *Archive) NeedsRotation(currentWriteSize int) bool {
 	a.Lock()
 	defer a.Unlock()
-	filename := a.formatFilename()
+	filename := a.formatFilename() // picks up time rotation
 	if filename != a.filename {
+		a.index = 0
 		return true
 	}
-	if a.sizeBytes+currentWriteSize > a.maxBytes {
+	if a.sizeBytes+currentWriteSize > a.maxBytes { // size rotation so increment index
+		a.index = a.index + 1
 		return true
 	}
 	return false
