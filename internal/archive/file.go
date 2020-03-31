@@ -17,13 +17,13 @@ type Archives struct {
 	Path string // path to write to
 	sync.Mutex
 	maxBytes int
-	keys     map[string]*Archive
+	archives map[string]*Archive
 }
 
 // New creates a new Archives et
 func New(maxBytes int) *Archives {
 	a := &Archives{}
-	a.keys = make(map[string]*Archive)
+	a.archives = make(map[string]*Archive)
 	a.maxBytes = maxBytes
 	return a
 }
@@ -32,14 +32,14 @@ func New(maxBytes int) *Archives {
 func (a *Archives) CheckAndClose() {
 	a.Lock()
 	defer a.Unlock()
-	for k, arch := range a.keys {
+	for k, arch := range a.archives {
 		if arch.NeedsRotation(0) {
 			err := arch.Close()
 			if err != nil {
 				log.Error().Err(err).Str("key", k).Str("filename", arch.filename).Msg("failed to close archive")
 				continue
 			}
-			delete(a.keys, k)
+			delete(a.archives, k)
 		}
 	}
 }
@@ -47,7 +47,7 @@ func (a *Archives) CheckAndClose() {
 // Writes a document with a certain key
 func (a *Archives) Write(topic, key string, doc []byte) error {
 	k := fmt.Sprintf("%s/%s", topic, key)
-	if a, ok := a.keys[k]; ok {
+	if a, ok := a.archives[k]; ok {
 		return writeErr(a, doc)
 	}
 	arch := &Archive{topic: topic, key: key, maxBytes: a.maxBytes, path: a.Path}
@@ -58,7 +58,7 @@ func (a *Archives) Write(topic, key string, doc []byte) error {
 	}
 	a.Lock()
 	defer a.Unlock()
-	a.keys[k] = arch
+	a.archives[k] = arch
 	return writeErr(arch, doc)
 }
 
@@ -128,8 +128,8 @@ func (a *Archive) Close() error {
 	return a.out.Close()
 }
 
-const template = "archive_topic=<TOPIC>_dt=<DATETIME>_accountUID=<KEY>_<INDEX>.log"
-const dateTimeFormat = "2006-01-02T15:00"
+const template = "topic=<TOPIC>_dt=<DATETIME>_accountUID=<KEY>_part=<INDEX>.log"
+const dateTimeFormat = "2006-01-02T15:00Z"
 
 // Write writes a provided document to the archive, checks if filename needs rotation
 func (a *Archive) Write(doc []byte) (int, error) {
