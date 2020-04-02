@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-stomp/stomp"
 	"github.com/jeks313/activemq-archiver/internal/archive"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog/log"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/pretty"
@@ -111,6 +112,8 @@ func (q *Queue) Consume(arch *archive.Archives) error {
 				log.Error().Err(err).Msg("queue: failed to ack message")
 				return err
 			}
+			messagesWritten.With(prometheus.Labels{"topic": q.Topic, "key": keyValue}).Inc()
+			messagesWrittenBytes.With(prometheus.Labels{"topic": q.Topic, "key": keyValue}).Add(float64(len(headersAndData)))
 		}
 	}
 }
